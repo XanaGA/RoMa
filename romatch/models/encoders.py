@@ -48,7 +48,7 @@ class CNNandDinov2(nn.Module):
         if self.amp:
             dinov2_vitl14 = dinov2_vitl14.to(self.amp_dtype)
         # self.dinov2_vitl14 = [dinov2_vitl14] # ugly hack to not show parameters to DDP
-        self.dinov2_vitl14 = dinov2_vitl14 # NOW IS NOT A LIST OR WE CANNOT CHANGE IT
+        self.dinov2_vitl14 = [dinov2_vitl14] # NOW IS NOT A LIST OR WE CANNOT CHANGE IT
     
     
     def train(self, mode: bool = True):
@@ -57,12 +57,17 @@ class CNNandDinov2(nn.Module):
     def forward(self, x, upsample = False):
         B,C,H,W = x.shape
         feature_pyramid = self.cnn(x)
+
+        if isinstance(self.dinov2_vitl14, list):
+            backbone = self.dinov2_vitl14[0]
+        else:
+            backbone = self.dinov2_vitl14
         
         if not upsample:
             with torch.no_grad():
-                if self.dinov2_vitl14.device != x.device:
-                    self.dinov2_vitl14 = self.dinov2_vitl14.to(x.device).to(self.amp_dtype)
-                dinov2_features_16 = self.dinov2_vitl14.forward_features(x.to(self.amp_dtype))
+                if backbone.device != x.device:
+                    backbone = backbone.to(x.device).to(self.amp_dtype)
+                dinov2_features_16 = backbone.forward_features(x.to(self.amp_dtype))
                 features_16 = dinov2_features_16['x_norm_patchtokens'].permute(0,2,1).reshape(B,1024,H//14, W//14)
                 del dinov2_features_16
                 feature_pyramid[16] = features_16
